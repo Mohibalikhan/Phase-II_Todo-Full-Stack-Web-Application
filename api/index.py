@@ -35,10 +35,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     DATABASE_URL = os.getenv("VERCEL_POSTGRES_URL")
 
-# Fallback to a local SQLite database for easy local development/testing
+# Require DATABASE_URL - no SQLite fallback (always use Neon)
 if not DATABASE_URL:
-    print("Warning: DATABASE_URL not set. Falling back to local SQLite database 'sqlite:///./dev.db' for development.")
-    DATABASE_URL = "sqlite:///./dev.db"
+    raise ValueError("DATABASE_URL must be set. Configure it in api/.env.local or environment variables.")
 
 # Create engine with NullPool for serverless compatibility
 engine = create_sqlalchemy_engine(
@@ -775,10 +774,11 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
+        "https://phase-ii-todo-full-stack-web-applic.vercel.app",
         "https://full-stack-todo-app-with-chatbot-fr.vercel.app",
         "https://full-stack-todo-frontend-iota.vercel.app",
     ],
-    allow_origin_regex=r"https://full-stack-todo-frontend.*\.vercel\.app",
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
