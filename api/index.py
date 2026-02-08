@@ -21,17 +21,24 @@ from jose import JWTError, jwt as jose_jwt
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import text  
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from api/.env.local and api/.env
+import pathlib
+api_dir = pathlib.Path(__file__).parent
+load_dotenv(api_dir / ".env.local")
+load_dotenv(api_dir / ".env")
+load_dotenv()  # Also load from root if present
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Try Vercel Postgres URL if DATABASE_URL is not set
 if not DATABASE_URL:
-    # For Vercel deployment, provide a fallback or raise an error
     DATABASE_URL = os.getenv("VERCEL_POSTGRES_URL")
-    if not DATABASE_URL:
-        raise ValueError("DATABASE_URL or VERCEL_POSTGRES_URL not found in environment variables")
+
+# Fallback to a local SQLite database for easy local development/testing
+if not DATABASE_URL:
+    print("Warning: DATABASE_URL not set. Falling back to local SQLite database 'sqlite:///./dev.db' for development.")
+    DATABASE_URL = "sqlite:///./dev.db"
 
 # Create engine with NullPool for serverless compatibility
 engine = create_sqlalchemy_engine(
@@ -792,6 +799,7 @@ def register(user_create: UserCreate, session: Session = Depends(get_session)):
     """
     Register a new user and return access token
     """
+    print(f"[BACKEND] POST /api/auth/register - email={user_create.email}")
     # Check if user already exists
     existing_user_statement = select(User).where(User.email == user_create.email)
     existing_user = session.exec(existing_user_statement).first()
@@ -833,6 +841,7 @@ def login(user_credentials: UserLogin, session: Session = Depends(get_session)):
     """
     Login a user and return access token
     """
+    print(f"[BACKEND] POST /api/auth/login - email={user_credentials.email}")
     user = authenticate_user(
         session=session,
         email=user_credentials.email,

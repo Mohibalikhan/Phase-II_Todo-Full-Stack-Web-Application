@@ -33,8 +33,11 @@ export default function RegisterForm() {
     setLoading(true)
 
     try {
+      console.log('RegisterForm: Calling register with', { email, password: '***' })
       await register(email, password)
+      console.log('RegisterForm: Register succeeded')
     } catch (err: any) {
+      console.error('RegisterForm: Register failed:', err)
       setError(err.message || 'An error occurred during registration')
     } finally {
       setLoading(false)

@@ -1,4 +1,4 @@
-// API service for backend communication
+// lib/api.ts
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
 // Helper function to get the auth token from localStorage
@@ -9,118 +9,117 @@ const getAuthToken = () => {
   return null
 }
 
-// Helper function to make authenticated requests
-const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
+// Generic function for authenticated requests (Todo, Chat)
+const makeAuthRequest = async (endpoint: string, options: RequestInit = {}) => {
   const token = getAuthToken()
-
-  const headers = new Headers({
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
-  });
-
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
   }
+  if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  })
-
-  // Handle 401 Unauthorized - token might be expired
-  if (response.status === 401) {
-    // Remove the expired token
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('access_token');
-    }
-    // Optionally redirect to login page - but we'll just throw the error for the calling function to handle
-    throw new Error('Unauthorized. Your session may have expired. Please log in again.')
-  }
-
-  if (!response.ok) {
-    let errorMessage = `HTTP error! status: ${response.status}`
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers })
+  if (!res.ok) {
+    let msg = `HTTP error! status: ${res.status}`
     try {
-      const errorData = await response.json()
-      errorMessage = errorData.detail || errorData.message || errorMessage
-    } catch (e) {
-      // If response is not JSON, use status text
-      errorMessage = response.statusText || errorMessage
-    }
-    throw new Error(errorMessage)
+      const errData = await res.json()
+      msg = errData.detail || errData.message || msg
+    } catch {}
+    throw new Error(msg)
   }
-
-  return response.json()
+  return res.json()
 }
 
-// Auth API functions
+// ---------------- AUTH APIs ---------------- //
 export const authAPI = {
+  // 🚀 Register
   register: async (email: string, password: string) => {
-    return makeRequest('/api/auth/register', {
+    console.log('[api.register] Posting to:', `${API_BASE_URL}/api/auth/register`)
+    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
-  },
 
-  login: async (email: string, password: string) => {
-    return makeRequest('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    })
-  },
-
-  logout: async () => {
-    // In a real implementation, you might want to call an API endpoint
-    // For now, we just remove the token from localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('access_token')
+    console.log('[api.register] Response status:', res.status)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      console.error('[api.register] Error response:', err)
+      throw new Error(err.message || err.detail || `Registration failed (${res.status})`)
     }
+
+    const data = await res.json()
+    console.log('[api.register] Success:', { user: data.user })
+    return data
+  },
+
+  // 🚀 Login
+  login: async (email: string, password: string) => {
+    console.log('[api.login] Posting to:', `${API_BASE_URL}/api/auth/login`)
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    console.log('[api.login] Response status:', res.status)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      console.error('[api.login] Error response:', err)
+      throw new Error(err.message || err.detail || `Login failed (${res.status})`)
+    }
+
+    const data = await res.json()
+    console.log('[api.login] Success:', { user: data.user })
+    return data
+  },
+
+  // 🚪 Logout
+  logout: async () => {
+    if (typeof window !== 'undefined') localStorage.removeItem('access_token')
   },
 }
 
-// Todo API functions
+// ---------------- TODO APIs ---------------- //
 export const todoAPI = {
-  getTodos: async () => {
-    return makeRequest('/api/todos')
-  },
-
-  createTodo: async (title: string, description?: string, due_date?: string, due_time?: string, priority?: 'low' | 'medium' | 'high', recurrence_rule?: 'daily' | 'weekly' | 'monthly' | 'none') => {
-    return makeRequest('/api/todos', {
+  getTodos: async () => makeAuthRequest('/api/todos'),
+  createTodo: async (
+    title: string,
+    description?: string,
+    due_date?: string,
+    due_time?: string,
+    priority?: 'low' | 'medium' | 'high',
+    recurrence_rule?: 'daily' | 'weekly' | 'monthly' | 'none'
+  ) =>
+    makeAuthRequest('/api/todos', {
       method: 'POST',
       body: JSON.stringify({ title, description, due_date, due_time, priority, recurrence_rule }),
-    })
-  },
-
-  getTodo: async (id: string) => {
-    return makeRequest(`/api/todos/${id}`)
-  },
-
-  updateTodo: async (id: string, updates: { title?: string; description?: string; completed?: boolean; due_date?: string; due_time?: string; priority?: 'low' | 'medium' | 'high'; recurrence_rule?: 'daily' | 'weekly' | 'monthly' | 'none' }) => {
-    return makeRequest(`/api/todos/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    })
-  },
-
-  deleteTodo: async (id: string) => {
-    return makeRequest(`/api/todos/${id}`, {
-      method: 'DELETE',
-    })
-  },
+    }),
+  getTodo: async (id: string) => makeAuthRequest(`/api/todos/${id}`),
+  updateTodo: async (
+    id: string,
+    updates: {
+      title?: string
+      description?: string
+      completed?: boolean
+      due_date?: string
+      due_time?: string
+      priority?: 'low' | 'medium' | 'high'
+      recurrence_rule?: 'daily' | 'weekly' | 'monthly' | 'none'
+    }
+  ) => makeAuthRequest(`/api/todos/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
+  deleteTodo: async (id: string) => makeAuthRequest(`/api/todos/${id}`, { method: 'DELETE' }),
 }
 
-// Chat API functions
+// ---------------- CHAT APIs ---------------- //
 export const chatAPI = {
-  sendMessage: async (message: string, conversationId?: string) => {
-    return makeRequest('/api/chat', {
+  sendMessage: async (message: string, conversationId?: string) =>
+    makeAuthRequest('/api/chat', {
       method: 'POST',
-      body: JSON.stringify({
-        message,
-        conversation_id: conversationId
-      }),
-    })
-  }
+      body: JSON.stringify({ message, conversation_id: conversationId }),
+    }),
 }
 
-// Convenience functions that directly return data
+// ---------------- CONVENIENCE EXPORTS ---------------- //
 export const register = authAPI.register
 export const login = authAPI.login
 export const logout = authAPI.logout
