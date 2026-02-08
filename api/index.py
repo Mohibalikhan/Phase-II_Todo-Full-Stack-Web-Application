@@ -559,6 +559,7 @@ def delete_todo(session: Session, todo_id_or_title: str, user_id: str) -> bool:
         todo = session.exec(statement).first()
 
     if not todo:
+         
          raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Todo '{todo_id_or_title}' not found"
